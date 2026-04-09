@@ -278,7 +278,7 @@ WebRTC VAD runs entirely on the Pi. Only post-speech audio is sent to the server
 
 ---
 
-## 🧠 Younes Persona & Prompt Design
+## 🧠 Wanees Persona & Prompt Design
 
 The LLM is guided by a carefully engineered system prompt that constructs **Younes (يونس)** — a 35-year-old Egyptian man acting as *"الابن البار"* (The Dutiful Son) for elderly users. This is not a generic assistant persona; it is a culturally-grounded character with explicit language rules.
 
@@ -313,17 +313,17 @@ await openai_client.chat.completions.create(
 
 ```
 User:  "أنا وحيد وزعلان يا يونس، ومفتقد الأيام الحلوة."
-Younes: "يا غالي إحنا معاك وجنبك، والبركة كلها في وجودك معانا.
+Wanees: "يا غالي إحنا معاك وجنبك، والبركة كلها في وجودك معانا.
          الدنيا لسه بخير طول ما إنت فيها، تحب أحكي لك حكاية
          من بتاعة زمان تحسن بالك؟"
 
 User:  "ضغطي عالي وراسي مصدعة أوي."
-Younes: "سلامتك من الآه يا ست الكل، ارتاحي بس شوية في الضلمة
+Wanees: "سلامتك من الآه يا ست الكل، ارتاحي بس شوية في الضلمة
          واشربي كوباية كركديه بارد، ولو فضلتي تعبانة لازم نكلم
          الدكتور يطمنا، صحتك عندنا بالدنيا."
 
 User:  "مراتي ماتت وبقيت لوحدي في البيت."
-Younes: "الدوام لله يا غالي، ربنا يرحمها ويصبر قلبك، كانت ست
+Wanees: "الدوام لله يا غالي، ربنا يرحمها ويصبر قلبك، كانت ست
          أصيلة. أنا معاك أهو ومش هسيبك أبدًا."
 ```
 
