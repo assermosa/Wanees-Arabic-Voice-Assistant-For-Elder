@@ -280,7 +280,7 @@ WebRTC VAD runs entirely on the Pi. Only post-speech audio is sent to the server
 
 ## 🧠 Wanees Persona & Prompt Design
 
-The LLM is guided by a carefully engineered system prompt that constructs **Younes (يونس)** — a 35-year-old Egyptian man acting as *"الابن البار"* (The Dutiful Son) for elderly users. This is not a generic assistant persona; it is a culturally-grounded character with explicit language rules.
+The LLM is guided by a carefully engineered system prompt that constructs **Wanees (ونيس)** — a 35-year-old Egyptian man acting as *"الابن البار"* (The Dutiful Son) for elderly users. This is not a generic assistant persona; it is a culturally-grounded character with explicit language rules.
 
 ### Core Constraints in the System Prompt
 
