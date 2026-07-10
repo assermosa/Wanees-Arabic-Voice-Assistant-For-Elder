@@ -1,20 +1,20 @@
 <div align="center">
 
 # 🎙️ ونيس — Wanees
-### *Empowering Elderly Care through Arabic Speech AI*
+### *An Egyptian-Arabic AI Voice Companion for the Elderly*
 
-> **An open-source, privacy-first, real-time Egyptian Arabic Voice Companion — engineered for the elderly across Egypt and the Middle East, optimized for edge deployment on Raspberry Pi with cloud inference on Lightning AI.**
+> **An open-source Egyptian Arabic voice companion — edge wake-word detection on Raspberry Pi, cloud inference (ASR → LLM → TTS) on a GPU server, built to speak the way a caring son or grandson would.**
 
 <br>
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
-[![Lightning AI](https://img.shields.io/badge/Developed%20on-Lightning%20AI-blueviolet?logo=lightning)](https://lightning.ai/)
+[![FastAPI](https://img.shields.io/badge/Server-FastAPI-009688?logo=fastapi)](server/main.py)
+[![Lightning AI](https://img.shields.io/badge/Deploy-Lightning%20AI-blueviolet)](https://lightning.ai/)
 [![vLLM](https://img.shields.io/badge/LLM_Inference-vLLM-green)](https://github.com/vllm-project/vllm)
 [![Qwen2.5](https://img.shields.io/badge/LLM-Qwen2.5--14B--AWQ-orange)](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-AWQ)
 [![EGTTS](https://img.shields.io/badge/TTS-EGTTS--V0.1-red)](https://huggingface.co/OmarSamir/EGTTS-V0.1)
-[![Edge Ready](https://img.shields.io/badge/Edge-Raspberry%20Pi-brightgreen?logo=raspberrypi)](https://www.raspberrypi.com/)
-[![Stars](https://img.shields.io/github/stars/assermosa/Voice-Assistant-For-Elder?style=social)](https://github.com/assermosa/Voice-Assistant-For-Elder)
+[![Edge Ready](https://img.shields.io/badge/Edge-Raspberry%20Pi-c51a4a?logo=raspberrypi)](https://www.raspberrypi.com/)
 
 <br>
 
@@ -27,242 +27,187 @@
 - [The Social Imperative](#-the-social-imperative)
 - [Key Features](#-key-features)
 - [System Architecture](#-system-architecture)
-- [Performance Benchmarks](#-performance-benchmarks)
+- [Latency Budget](#-latency-budget)
 - [Model Stack](#-model-stack)
-- [Younes Persona & Prompt Design](#-younes-persona--prompt-design)
+- [Wanees Persona & Prompt Design](#-wanees-persona--prompt-design)
 - [Emergency Detection System](#-emergency-detection-system)
-- [WebSocket Protocol](#-websocket-protocol)
+- [HTTP API Reference](#-http-api-reference)
 - [Server Setup (Lightning AI)](#-server-setup-lightning-ai)
 - [Raspberry Pi Client Setup](#-raspberry-pi-client-setup)
-- [Wake Word Training](#-wake-word-training)
+- [Wake Word Training (Porcupine)](#-wake-word-training-porcupine)
 - [Project Structure](#-project-structure)
-- [Future Roadmap](#-future-roadmap)
+- [Roadmap](#-roadmap)
 - [Contributing](#-contributing)
-- [Citation](#-citation)
+- [License](#-license)
 
 ---
 
 ## 🌍 The Social Imperative
 
-The Arab world is undergoing one of the fastest demographic aging transitions in history. By 2050, the elderly population in the MENA region is projected to **triple**, yet assistive technology for Arabic-speaking elderly users remains critically underdeveloped. Existing global voice assistants (Alexa, Siri, Google Assistant) fail this population on multiple axes: they do not speak Egyptian Ammiya, they depend on cloud infrastructure that harvests sensitive data, and they are designed for the tech-literate general consumer — not for a 75-year-old in Cairo who simply wants to talk.
+The Arab world is aging fast — the elderly population across MENA is projected to grow substantially over the coming decades — yet assistive voice technology for Arabic speakers remains underdeveloped. Mainstream assistants (Alexa, Siri, Google Assistant) fall short for this population on several fronts: they don't speak Egyptian Ammiya, they're built around app-driven UX rather than voice-first interaction, and they have no concept of "the person on the other end may need comfort, not just an answer."
 
-**Wanees (ونيس)** — meaning *companion* or *the one who brings comfort* in Egyptian Arabic — was built to close that gap.
+**Wanees (ونيس)** — meaning *companion*, *the one who brings comfort* — is built to close that gap: a warm, dialect-fluent, familial voice that also knows when to stop being a chatbot and raise an alarm.
 
-| Challenge | Global Assistants | Wanees |
+| Challenge | Typical Voice Assistants | Wanees |
 |---|---|---|
-| **Arabic Dialect** | Modern Standard Arabic only | Egyptian Ammiya (Cairo/Delta) |
-| **Privacy** | Cloud-dependent, data harvested | Edge VAD + Wake Word, no raw audio stored |
-| **Persona** | Generic, robotic | "الابن البار" — Warm, familial Egyptian companion |
-| **Emergency Response** | None | Keyword detection → instant TTS bypass + family alert |
-| **Medication Reminders** | None | Backend push via WebSocket → synthesized speech |
-| **Latency** | 2–8s (network-dependent) | ~4s end-to-end on T4 GPU |
+| **Arabic dialect** | Modern Standard Arabic only | Egyptian Ammiya (Cairo/Delta) |
+| **Persona** | Generic, corporate | "الابن البار" — a dutiful son / warm grandson |
+| **Emergency response** | None | Keyword detection → immediate calming reply + async caregiver alert |
+| **Medication reminders** | None | Backend-pushed, queued per device, delivered as spoken audio |
+| **Compute split** | Varies | Heavy models on GPU server; Pi only handles wake word, VAD, and playback |
 
 ---
 
 ## ✨ Key Features
 
-- 🗣️ **Egyptian Ammiya ASR** — Wav2Vec2-XLSR-53 fine-tuned on Egyptian Arabic (`IbrahimAmin/egyptian-arabic-wav2vec2-xlsr-53`)
-- 🧠 **Arabic LLM via vLLM** — `Qwen/Qwen2.5-14B-Instruct-AWQ` with PagedAttention, AWQ 4-bit quantization, max 2048 context
-- 🔊 **Egyptian TTS** — `OmarSamir/EGTTS-V0.1` (XTTS-v2 fine-tuned on Egyptian speech), streaming PCM chunks at 24kHz
-- 👂 **Custom Wake Word** — `ونيس` / `يا ونيس` via TFLite classifier + OpenWakeWord `AudioFeatures` embedding, scored every 320ms
-- 🎯 **WebRTC VAD** — Endpointing with 1.2s silence threshold, 20ms frames; energy-based fallback if `webrtcvad` unavailable
-- 🚨 **Emergency Detection** — 10 Egyptian Ammiya distress keywords bypass the LLM entirely + fire async backend alert
-- 💊 **Medication Reminder Push** — Backend pushes reminders to any Pi over the same WebSocket connection
-- 🔁 **Per-Device Conversation History** — 6-turn rolling context window, keyed by `user_id`
-- ⚡ **Streaming TTS Delivery** — Audio sliced into 0.5s PCM chunks; Pi starts playing before synthesis completes
-- 🌐 **Clean WebSocket Protocol** — JSON event frames + binary PCM audio over a single persistent connection
+- 🗣️ **Egyptian Ammiya ASR** — `IbrahimAmin/egyptian-arabic-wav2vec2-xlsr-53` via a HuggingFace `pipeline`, float16 on CUDA
+- 🧠 **Egyptian-persona LLM** — `Qwen/Qwen2.5-14B-Instruct-AWQ`, served through [vLLM](https://github.com/vllm-project/vllm)'s OpenAI-compatible API, constrained to a warm, dialect-only, sub-140-character persona
+- 🔊 **Egyptian TTS** — `OmarSamir/EGTTS-V0.1` (an XTTS variant fine-tuned on Egyptian speech), synthesized once per reply and streamed back in 0.3s PCM chunks at 24kHz
+- 👂 **Wake word on the edge** — [Porcupine](https://picovoice.ai/platform/porcupine/) with a custom-trained `.ppn` keyword model, running entirely on the Pi CPU
+- 🎯 **Streaming VAD endpointing** — [Silero VAD](https://github.com/snakers4/silero-vad)'s `VADIterator` detects the end of speech in real time (600ms silence threshold) instead of relying on a fixed recording window
+- 🚨 **Emergency keyword detection** — 11 Egyptian Ammiya distress phrases bypass the LLM entirely and fire a non-blocking alert to a caregiver backend
+- 💊 **Medication reminders** — a caregiver backend pushes text to a per-user queue; the Pi polls for pending reminders and fetches synthesized audio on demand
+- 🔁 **Rolling per-device conversation history** — last 6 turns kept in memory, last 2 injected into each LLM call to keep prompts short and latency low
+- ⚡ **Streaming audio delivery** — the server responds to `/transcribe/{user_id}` with a chunked `StreamingResponse`, so the Pi can start playback before the full reply has finished streaming down
 
 ---
 
 ## 🏗️ System Architecture
 
-### Two-File Design
+### Two-component design
 
 ```
-server.py    ←  Lightning AI Cloud  (ASR + LLM + TTS + WebSocket server)
-pi_main.py   ←  Raspberry Pi Edge   (Wake Word + VAD + Audio I/O + WebSocket client)
+server/main.py    ←  GPU host (Lightning AI Studio)   — FastAPI: ASR + LLM + TTS + reminder queue
+client/pi_client.py  ←  Raspberry Pi (edge)             — Porcupine wake word + Silero VAD + playback
 ```
 
-### Full Pipeline
+### Full pipeline
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                     RASPBERRY PI (Edge)                              │
-│                                                                      │
-│  🎤 Microphone  (16kHz, mono, int16)                                 │
-│        │                                                             │
-│        ▼  CHUNK_SIZE=1280 samples (80ms)                             │
-│  ┌──────────────────────────────────────┐                            │
-│  │  TFLite Wake Word Classifier         │  Rolling 1-second buffer   │
-│  │  "ونيس" / "يا ونيس"                  │  AudioFeatures.embed_clips │
-│  │  threshold = 0.4                     │  Scored every 4 chunks     │
-│  │  cooldown  = 2.0s                    │  → (320ms scoring interval)│
-│  └─────────────────┬────────────────────┘                            │
-│                    │ score ≥ 0.4                                      │
+│                                                                       │
+│  🎤 Microphone  (16kHz, mono, int16)                                  │
+│        │                                                              │
+│        ▼  frame_length = Porcupine.frame_length (~512 samples)        │
+│  ┌──────────────────────────────────────┐                             │
+│  │  Porcupine Wake Word (.ppn)          │  Runs on every audio frame  │
+│  │  Custom-trained keyword model        │  Near-zero CPU overhead     │
+│  └─────────────────┬─────────────────────┘                            │
+│                    │ keyword detected                                  │
 │                    ▼                                                  │
-│             🔔 Beep (880Hz, 150ms)                                   │
-│                    │                                                  │
-│                    ▼                                                  │
-│  ┌──────────────────────────────────────┐                            │
-│  │  WebRTC VAD  (aggressiveness=2)      │  20ms frames               │
-│  │  Stop on 1.2s silence               │  Energy VAD fallback        │
-│  │  Min 0.8s / Max 10s recording       │                             │
-│  └─────────────────┬────────────────────┘                            │
-│                    │ raw PCM-16 bytes                                  │
-└────────────────────┼─────────────────────────────────────────────────┘
+│  ┌──────────────────────────────────────┐                             │
+│  │  Silero VAD  (VADIterator)           │  Streaming, frame-by-frame  │
+│  │  min_silence_duration_ms = 600       │  speech_pad_ms = 100        │
+│  │  0.8s fallback silence guard         │  5s max-wait-for-speech     │
+│  └─────────────────┬─────────────────────┘                            │
+│                    │ raw PCM-16 bytes (accumulated speech frames)      │
+└────────────────────┼──────────────────────────────────────────────────┘
                      │
-                     │  WebSocket  ws://<server>:8765
-                     │  Frame 1 (text):   JSON header
-                     │  Frame 2 (binary): raw PCM bytes
+                     │  HTTP POST /transcribe/{user_id}
+                     │  Content-Type: audio/octet-stream
+                     │  Body: raw PCM-16 mono 16kHz bytes
                      ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│                     LIGHTNING AI SERVER (Cloud GPU)                  │
-│                                                                      │
-│  WebSocket Handler  (max_size=20MB, ping_interval=20s)               │
-│        │                                                             │
-│        ▼                                                             │
-│  ┌─────────────────────────────────────────┐                         │
-│  │  ASR: IbrahimAmin/                      │                         │
-│  │  egyptian-arabic-wav2vec2-xlsr-53       │ → {"type":"asr"}        │
-│  │  float16, CUDA, HuggingFace pipeline    │                         │
-│  └────────────────────┬────────────────────┘                         │
-│                       │ Arabic transcript                             │
-│                       ▼                                              │
-│  ┌─────────────────────────────────────────┐                         │
-│  │  Emergency Keyword Check                │                         │
-│  │  10 Egyptian Ammiya distress phrases    │ → {"type":"emergency"}  │
-│  │  + async backend alert (non-blocking)   │   + LLM bypassed        │
-│  └────────────────────┬────────────────────┘                         │
+│                     GPU SERVER (Lightning AI)                        │
+│                                                                       │
+│  FastAPI endpoint  /transcribe/{user_id}                              │
+│        │                                                              │
+│        ▼                                                              │
+│  ┌─────────────────────────────────────────┐                          │
+│  │  ASR: IbrahimAmin/                      │                          │
+│  │  egyptian-arabic-wav2vec2-xlsr-53       │  float16, CUDA           │
+│  │  run via run_in_executor (non-blocking) │                          │
+│  └────────────────────┬────────────────────┘                          │
+│                       │ Arabic transcript                              │
+│                       ▼                                               │
+│  ┌─────────────────────────────────────────┐                          │
+│  │  Emergency Keyword Check                │                          │
+│  │  11 Egyptian Ammiya distress phrases    │  substring match         │
+│  │  asyncio.create_task → backend alert    │  non-blocking            │
+│  └────────────────────┬────────────────────┘                          │
 │               no emergency │                                          │
-│                       ▼                                              │
-│  ┌─────────────────────────────────────────┐                         │
-│  │  LLM: Qwen/Qwen2.5-14B-Instruct-AWQ    │                         │
-│  │  via vLLM OpenAI-compatible API         │ → {"type":"llm"}        │
-│  │  temp=0.1, top_p=0.85, max_tokens=80   │                         │
-│  │  6-turn history, 2 turns per request   │                         │
-│  └────────────────────┬────────────────────┘                         │
-│                       │ Egyptian Ammiya reply (≤140 chars)           │
-│                       ▼                                              │
-│  ┌─────────────────────────────────────────┐                         │
-│  │  TTS: OmarSamir/EGTTS-V0.1             │                         │
-│  │  XTTS-v2 fine-tuned on Egyptian Arabic  │ → binary PCM chunks     │
-│  │  24kHz, speed=0.9, 0.5s chunks         │ → {"type":"tts_end"}    │
-│  └────────────────────┬────────────────────┘                         │
-└───────────────────────┼──────────────────────────────────────────────┘
-                        │ Binary PCM-16 chunks (24kHz) streamed back
+│                       ▼                                               │
+│  ┌─────────────────────────────────────────┐                          │
+│  │  LLM: Qwen/Qwen2.5-14B-Instruct-AWQ     │                          │
+│  │  via vLLM OpenAI-compatible client       │                          │
+│  │  temp=0.3, top_p=0.85, max_tokens=80    │                          │
+│  │  last 2 turns of rolling history         │                          │
+│  └────────────────────┬────────────────────┘                          │
+│                       │ Egyptian Ammiya reply (cleaned, ≤200 chars)    │
+│                       ▼                                               │
+│  ┌─────────────────────────────────────────┐                          │
+│  │  TTS: OmarSamir/EGTTS-V0.1               │                          │
+│  │  XTTS-based, 24kHz, speed=0.9            │                          │
+│  │  synthesized once, chunked into 0.3s PCM │                          │
+│  └────────────────────┬────────────────────┘                          │
+└───────────────────────┼───────────────────────────────────────────────┘
+                        │  StreamingResponse — chunked PCM-16 24kHz
                         ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │  RASPBERRY PI — Playback                                             │
-│  np.frombuffer(buffer, dtype=np.int16)                               │
-│  sd.play(audio_np, samplerate=24000)                                 │
+│  np.frombuffer(tts_buf, dtype=np.int16)                              │
+│  sd.play(audio, samplerate=24000); sd.wait()                         │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-### Mermaid Diagram
+### Mermaid diagram
 
 ```mermaid
 flowchart TD
-    A[🎤 Microphone\n16kHz mono int16] --> B[TFLite Wake Word\nونيس / يا ونيس\nthreshold=0.4\ncooldown=2s]
-    B -->|score ≥ 0.4| C[🔔 Beep 880Hz 150ms]
-    C --> D[WebRTC VAD\n1.2s silence → stop\nmax 10s / min 0.8s]
-    D -->|raw PCM-16 bytes| E[WebSocket\nJSON header + binary frame\nws port 8765]
+    A["🎤 Microphone\n16kHz mono int16"] --> B["Porcupine Wake Word\ncustom .ppn model"]
+    B -->|keyword detected| C["Silero VAD (streaming)\nmin_silence_duration_ms=600\nspeech_pad_ms=100"]
+    C -->|raw PCM-16 bytes| D["HTTP POST\n/transcribe/{user_id}"]
 
-    E --> F[Egyptian ASR\nWav2Vec2-XLSR-53\nfloat16 CUDA]
-    F -->|Arabic transcript| G{Emergency\nKeyword Check\n10 Ammiya phrases}
+    D --> E["Egyptian ASR\nWav2Vec2-XLSR-53\nfloat16 CUDA"]
+    E -->|Arabic transcript| F{"Emergency Keyword\nCheck (11 phrases)"}
 
-    G -->|detected| H[🚨 Pre-written TTS\nLLM bypassed\nasync backend alert]
-    G -->|safe| I[Qwen2.5-14B-AWQ\nvia vLLM API\ntemp=0.1 max_tokens=80]
+    F -->|detected| G["🚨 Pre-written calming reply\nLLM bypassed\nasync backend alert"]
+    F -->|safe| H["Qwen2.5-14B-AWQ via vLLM\ntemp=0.3, max_tokens=80"]
 
-    I -->|Ammiya reply ≤140 chars| J[EGTTS-V0.1\nXTTS-v2 Egyptian\n24kHz speed=0.9]
-    H --> J
+    H -->|Ammiya reply| I["EGTTS-V0.1\nXTTS Egyptian, 24kHz"]
+    G --> I
 
-    J -->|0.5s PCM chunks streamed| K[🔊 Pi Playback\nsd.play 24000Hz]
+    I -->|0.3s PCM chunks, StreamingResponse| J["🔊 Pi Playback\nsd.play 24000Hz"]
 
     subgraph Pi["📟 Raspberry Pi — Edge"]
         A
         B
         C
-        D
-        K
+        J
     end
 
-    subgraph Cloud["☁️ Lightning AI — T4/A100 GPU"]
+    subgraph Server["☁️ GPU Server — Lightning AI"]
+        D
         E
         F
         G
         H
         I
-        J
     end
 
     style Pi fill:#1a2e1a,stroke:#4fc77a,color:#fff
-    style Cloud fill:#1a1a2e,stroke:#4f8ef7,color:#fff
+    style Server fill:#1a1a2e,stroke:#4f8ef7,color:#fff
 ```
 
 ---
 
-## ⚡ Performance Benchmarks
+## ⏱️ Latency Budget
 
-Wanees achieves **~4 seconds end-to-end latency** from end of utterance to first audio playback on the Pi — measured on Lightning AI T4 GPU.
+> These are **rough, hardware-dependent estimates** for a single-GPU deployment (A10G-class or better) meant to help with capacity planning — not measured benchmarks from this exact repo. Run your own profiling before relying on any number here.
 
-### Latency Breakdown
-
-| Stage | Component | Measured Latency |
+| Stage | Component | Typical range |
 |---|---|---|
-| Wake word scoring | TFLite + AudioFeatures (Pi) | < 320ms per scoring window |
-| VAD recording | WebRTC 20ms frames (Pi) | 0.8–10s (utterance-dependent) |
-| Network transfer | PCM bytes over WebSocket | ~50–200ms |
-| ASR inference | Wav2Vec2-XLSR-53 float16 CUDA | ~300–600ms |
-| Emergency scan | 10 keyword substring check | < 1ms |
-| LLM first token | Qwen2.5-14B-AWQ via vLLM | ~800–1,200ms |
-| TTS synthesis | EGTTS-V0.1 full utterance | ~800–1,500ms |
-| First audio chunk to Pi | 0.5s PCM stream start | ~200ms after synth begins |
-| **Server-side total** | **ASR → LLM → first TTS chunk** | **~2.1–3.3s** |
-| **End-to-end total** | **Utterance end → audio plays** | **~3.5–4.5s** |
+| Wake word detection | Porcupine (Pi CPU) | Sub-frame, negligible |
+| VAD endpointing | Silero VAD streaming (Pi CPU) | Bounded by `min_silence_duration_ms=600` + utterance length |
+| Network transfer | Raw PCM over HTTP | Depends on utterance length and connection |
+| ASR inference | Wav2Vec2-XLSR-53, float16 CUDA | Sub-second on a modern GPU for short utterances |
+| Emergency scan | 11-keyword substring check | Negligible (<1ms) |
+| LLM generation | Qwen2.5-14B-AWQ via vLLM, `max_tokens=80` | Roughly 1–2s depending on GPU and load |
+| TTS synthesis | EGTTS-V0.1, full utterance | Roughly 1–2s depending on reply length and GPU |
+| First audio chunk to Pi | 0.3s chunking over `StreamingResponse` | Adds a small, near-immediate delay after synthesis starts |
 
-### Optimization Details
-
-**AWQ 4-bit Quantization + vLLM PagedAttention**
-
-`Qwen2.5-14B-Instruct-AWQ` shrinks the model from ~28GB (FP16) to ~7GB, fitting on a T4 alongside ASR and TTS. vLLM's PagedAttention virtualizes KV cache memory, eliminating fragmentation. `max_tokens=80` hard-caps generation to match the 140-character persona constraint — no wasted decode cycles.
-
-```bash
-vllm serve Qwen/Qwen2.5-14B-Instruct-AWQ \
-  --quantization awq \
-  --dtype half \
-  --max-model-len 2048 \
-  --gpu-memory-utilization 0.6 \
-  --port 8000
-```
-
-**Streaming TTS Chunk Delivery**
-
-EGTTS synthesizes the full utterance on GPU, then the PCM-16 array is sliced into 0.5-second chunks (12,000 samples at 24kHz) and yielded over the WebSocket immediately. The Pi begins playback on the first chunk while subsequent chunks are still arriving:
-
-```python
-samples_per_chunk = int(TTS_SAMPLE_RATE * chunk_seconds)  # 12,000
-for start in range(0, len(wav_i16), samples_per_chunk):
-    yield wav_i16[start : start + samples_per_chunk].tobytes()
-    await asyncio.sleep(0)   # yield to event loop between sends
-```
-
-**CUDA Graph + TF32 Optimizations**
-
-```python
-torch.backends.cudnn.benchmark = True
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.allow_tf32 = True
-torch.set_float32_matmul_precision("high")
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
-```
-
-**Edge VAD Pre-filtering**
-
-WebRTC VAD runs entirely on the Pi. Only post-speech audio is sent to the server — silence is never transmitted, keeping payload size and server processing minimal.
-
-**LLM Constraint Design**
-
-`temperature=0.1` and `max_tokens=80` ensure fast, deterministic outputs. The 140-character brevity constraint in the system prompt accelerates model convergence. Rolling 6-turn history (only 2 turns injected per request) keeps the prompt short and latency bounded.
+The design choices that most affect these numbers: **AWQ 4-bit quantization** to fit the LLM comfortably on a single GPU alongside ASR/TTS, a **hard `max_tokens=80` cap** paired with the persona's brevity constraint, and **chunked TTS streaming** so the Pi doesn't wait for the entire reply to finish synthesizing before it starts playing audio.
 
 ---
 
@@ -270,37 +215,35 @@ WebRTC VAD runs entirely on the Pi. Only post-speech audio is sent to the server
 
 | Component | Model ID | Notes |
 |---|---|---|
-| **ASR** | `IbrahimAmin/egyptian-arabic-wav2vec2-xlsr-53` | HuggingFace pipeline, float16, CUDA |
-| **LLM** | `Qwen/Qwen2.5-14B-Instruct-AWQ` | Served via vLLM, AWQ 4-bit, `gpu_memory_utilization=0.6` |
-| **TTS** | `OmarSamir/EGTTS-V0.1` | XTTS-v2 fine-tuned on Egyptian Arabic, 24kHz, `speed=0.9` |
-| **Wake Word** | `wanees.tflite` (custom) | TFLite classifier + OpenWakeWord `AudioFeatures` embedding |
-| **VAD** | `webrtcvad` Python package | aggressiveness=2, 20ms frames; RMS energy fallback |
+| **ASR** | `IbrahimAmin/egyptian-arabic-wav2vec2-xlsr-53` | HuggingFace `pipeline`, float16, CUDA |
+| **LLM** | `Qwen/Qwen2.5-14B-Instruct-AWQ` | Served via vLLM, AWQ 4-bit, `--gpu-memory-utilization 0.6` |
+| **TTS** | `OmarSamir/EGTTS-V0.1` | XTTS-based, fine-tuned on Egyptian Arabic, 24kHz, `speed=0.9` |
+| **Wake word** | Custom `.ppn` (trained via [Picovoice Console](https://console.picovoice.ai)) | Runs on-device via `pvporcupine` |
+| **VAD** | [Silero VAD](https://github.com/snakers4/silero-vad) | Streaming `VADIterator`, loaded via `torch.hub` |
 
 ---
 
 ## 🧠 Wanees Persona & Prompt Design
 
-The LLM is guided by a carefully engineered system prompt that constructs **Wanees (ونيس)** — a 35-year-old Egyptian man acting as *"الابن البار"* (The Dutiful Son) for elderly users. This is not a generic assistant persona; it is a culturally-grounded character with explicit language rules.
+The LLM is steered by a detailed system prompt (`ELDERLY_PROMPT` in `server/main.py`) that constructs **Wanees** — a 35-year-old Egyptian man acting as *"الابن البار"* (the dutiful son) for elderly users. This isn't a generic assistant persona; it's a culturally-grounded character with hard language constraints.
 
-### Core Constraints in the System Prompt
+**Dialect enforcement** — responses must use Egyptian street Arabic (Ammiya Masriya) only. Fusha constructs (`سوف`, `لماذا`, `كيف`, `لا تقلق`) are explicitly banned in favor of Egyptian equivalents (`هـ`, `ليه`, `إزاي`, `متقلقش`).
 
-**Dialect enforcement** — All responses must use Egyptian Street Arabic (Ammiya Masriya). Fusha constructs (`سوف`, `لماذا`, `كيف`, `لا تقلق`) are explicitly banned. Egyptian equivalents (`هـ`, `ليه`, `إزاي`, `متقلقش`) are required.
+**Honorifics** — the model consistently uses Egyptian terms of endearment: `يا والدنا`, `يا ست الكل`, `يا غالي`, `يا فندم`, `يا حبيبي`.
 
-**Honorifics** — The model constantly uses Egyptian terms of endearment: `يا والدنا`, `يا ست الكل`, `يا غالي`, `يا فندم`, `يا حبيبي`.
+**Brevity constraint** — replies are meant to stay under 140 characters, tuned for natural-sounding TTS and elderly listening attention spans; `max_tokens=80` backs this up as a hard ceiling on generation.
 
-**Brevity constraint** — Responses are capped at 140 characters, optimized for TTS synthesis speed and elderly listening attention spans. This also makes `max_tokens=80` a safe hard ceiling.
+**Spirituality** — common Egyptian blessings are woven in naturally: `ربنا يبارك في عمرك`, `ربنا يشفيك ويعافيك`, `الدوام لله`.
 
-**Spirituality** — Egyptian blessings are woven in naturally: `ربنا يبارك في عمرك`, `ربنا يشفيك ويعافيك`, `الدوام لله`.
+**Medical framing** — home-style comfort advice (e.g. "drink warm hibiscus tea") is always paired with a gentle nudge to check with a real doctor — never a diagnosis, never a substitute for care.
 
-**Medical framing** — Home-style comfort advice (e.g. `اشربي كوباية كركديه بارد`) is always followed by a gentle referral to a doctor.
-
-### LLM Call Parameters
+### LLM call parameters (as implemented)
 
 ```python
 await openai_client.chat.completions.create(
     model="Qwen/Qwen2.5-14B-Instruct-AWQ",
     messages=messages,
-    temperature=0.1,
+    temperature=0.3,
     top_p=0.85,
     max_tokens=80,
     frequency_penalty=0.3,
@@ -309,29 +252,29 @@ await openai_client.chat.completions.create(
 )
 ```
 
-### Few-Shot Examples (from the live system prompt)
+### Few-shot examples (from the live system prompt)
 
 ```
-User:  "أنا وحيد وزعلان يا يونس، ومفتقد الأيام الحلوة."
+User:   "أنا وحيد وزعلان يا ونيس، ومفتقد الأيام الحلوة."
 Wanees: "يا غالي إحنا معاك وجنبك، والبركة كلها في وجودك معانا.
          الدنيا لسه بخير طول ما إنت فيها، تحب أحكي لك حكاية
          من بتاعة زمان تحسن بالك؟"
 
-User:  "ضغطي عالي وراسي مصدعة أوي."
+User:   "ضغطي عالي وراسي مصدعة أوي."
 Wanees: "سلامتك من الآه يا ست الكل، ارتاحي بس شوية في الضلمة
          واشربي كوباية كركديه بارد، ولو فضلتي تعبانة لازم نكلم
          الدكتور يطمنا، صحتك عندنا بالدنيا."
 
-User:  "مراتي ماتت وبقيت لوحدي في البيت."
+User:   "مراتي ماتت وبقيت لوحدي في البيت."
 Wanees: "الدوام لله يا غالي، ربنا يرحمها ويصبر قلبك، كانت ست
-         أصيلة. أنا معاك أهو ومش هسيبك أبدًا."
+         أصيلة وعمرها ما تتعوض. أنا معاك أهو ومش هسيبك أبدًا."
 ```
 
 ---
 
 ## 🚨 Emergency Detection System
 
-Every ASR transcript is scanned for 10 Egyptian Ammiya distress keywords **before the LLM is called**:
+Every ASR transcript is scanned for 11 Egyptian Ammiya distress keywords **before the LLM is ever called**:
 
 ```python
 EMERGENCY_KEYWORDS = [
@@ -341,57 +284,59 @@ EMERGENCY_KEYWORDS = [
 ]
 ```
 
-When a keyword is detected the pipeline:
+When a keyword is detected, the pipeline:
 
-1. **Bypasses the LLM entirely** — zero generation latency
-2. **Immediately synthesizes this pre-written calming response:**
+1. **Bypasses the LLM entirely** — no generation latency on the critical path
+2. **Immediately synthesizes a pre-written calming response:**
    > *"متقلقش يا غالي، أنا كلمت أهلك دلوقتي وهما زمانهم جايين في الطريق. خليك هادي وأنا جنبك مش هسيبك."*
-3. **Fires `send_emergency_signal_to_backend(user_id, transcript)` as an `asyncio.create_task`** — fully non-blocking, audio plays without any delay
-4. **Sends `{"type": "emergency", "text": "..."}` JSON event** to the Pi for logging or LED/display indicators
+3. **Fires `send_emergency_signal_to_backend(user_id, transcript)` as an `asyncio.create_task`** — fully non-blocking, so audio starts playing without waiting on the alert request
+4. **Logs a warning server-side** for observability
 
-The backend alert function is a clearly marked placeholder ready for HTTP POST, MQTT, SMS gateway, or any notification service:
+The alert function POSTs to `EMERGENCY_ENDPOINT` (configurable via `.env`) and is wrapped in a broad `try/except` with `log.exception` on failure — deliberately, since a swallowed failure on this path is the worst possible outcome:
 
 ```python
 async def send_emergency_signal_to_backend(user_id: str, transcript: str) -> None:
-    log.warning("🚨 EMERGENCY detected for user=%s", user_id)
-    # async with aiohttp.ClientSession() as session:
-    #     await session.post("https://your-backend.com/api/emergency", ...)
+    log.warning("🚨 EMERGENCY detected | user=%s | transcript=%s", user_id, transcript)
+    try:
+        async with aiohttp.ClientSession(timeout=EMERGENCY_TIMEOUT) as session:
+            async with session.post(EMERGENCY_ENDPOINT, json={"user_id": user_id, "transcript": transcript}) as resp:
+                if resp.status >= 400:
+                    log.error("Emergency backend returned %s for user=%s", resp.status, user_id)
+    except Exception:
+        log.exception("Failed to deliver emergency signal for user=%s", user_id)
 ```
+
+> Substring matching is intentional here, not a placeholder to be embarrassed about: it's fast, deterministic, and requires no model inference on a path where a missed detection is far worse than a false alarm. If you replace it with a classifier, validate it against a labeled dataset first.
 
 ---
 
-## 🔌 WebSocket Protocol
+## 🔌 HTTP API Reference
 
-The server binds on `0.0.0.0:8765` (override via `WS_HOST` / `WS_PORT`). One handler serves both Pi clients and backend medication pushes.
+The server is plain HTTP/FastAPI — no WebSocket layer. All endpoints live in `server/main.py`.
 
-### Pi → Server: audio utterance
+| Endpoint | Method | Request | Response |
+|---|---|---|---|
+| `/transcribe/{user_id}` | `POST` | Body: raw PCM-16 mono 16kHz bytes, `Content-Type: audio/octet-stream` | `StreamingResponse`, chunked PCM-16 mono 24kHz audio (`X-Sample-Rate`, `X-Encoding`, `X-User-Id` headers) |
+| `/remind` | `POST` | JSON: `{"user_id": "...", "text": "..."}` | `{"status": "queued"}` |
+| `/remind/pending/{user_id}` | `GET` | — | `{"pending": true, "text": "..."}` or `{"pending": false}` (pops the oldest queued reminder) |
+| `/remind/audio?text=...` | `GET` | Query param `text` | `StreamingResponse`, chunked PCM-16 mono 24kHz audio of the synthesized text |
+| `/health` | `GET` | — | `{"status": "ok", "device": "cuda"/"cpu", "pipeline_ready": bool, "vllm_base": "..."}` |
 
+### Example: sending audio
+
+```bash
+curl -X POST "https://your-server.example.com/transcribe/pi-living-room-001" \
+  -H "Content-Type: audio/octet-stream" \
+  --data-binary @utterance.pcm \
+  --output reply.pcm
 ```
-Frame 1 (text JSON):
-  {"type": "audio", "user_id": "pi-living-room-001", "encoding": "pcm16_16k_mono"}
 
-Frame 2 (binary):
-  <raw PCM-16 bytes — 16kHz mono int16>
-```
+### Example: queueing a medication reminder
 
-### Backend → Server: medication reminder push
-
-```
-Frame 1 (text JSON):
-  {"type": "medication_reminder", "user_id": "pi-living-room-001", "text": "حان وقت دواء الضغط يا غالي"}
-```
-
-### Server → Pi: response stream
-
-```
-{"type": "asr",                "text": "..."}          ← transcript ready
-{"type": "llm",                "text": "..."}          ← Younes text reply
-{"type": "emergency",          "text": "..."}          ← emergency reply text
-<binary frame>                                         ← PCM-16 24kHz TTS chunk (0.5s)
-<binary frame>                                         ← next 0.5s chunk ...
-{"type": "tts_end"}                                    ← signal Pi to start playback
-{"type": "medication_reminder","text": "..."}          ← reminder text echo
-{"type": "error",              "message": "..."}       ← error description
+```bash
+curl -X POST "https://your-server.example.com/remind" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "pi-living-room-001", "text": "حان وقت دواء الضغط يا غالي"}'
 ```
 
 ---
@@ -400,23 +345,18 @@ Frame 1 (text JSON):
 
 ### Prerequisites
 
-- Lightning AI Studio with **T4 or A100 GPU** (T4 minimum for ASR + LLM + TTS simultaneously)
-- Python 3.10+, CUDA 12.1
+- A GPU Studio — **A10G or better** recommended (enough headroom for ASR + LLM + TTS together)
+- Python 3.10+, CUDA-capable environment
 
-### 1. Clone & Install
+### 1. Clone & install
 
 ```bash
-git clone https://github.com/assermosa/Voice-Assistant-For-Elder.git
-cd Voice-Assistant-For-Elder
-
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
-pip install transformers accelerate huggingface_hub
-pip install TTS                   # Coqui TTS — provides XTTS-v2 / EGTTS
-pip install vllm
-pip install websockets lightning openai numpy
+git clone https://github.com/<your-org>/wanees.git
+cd wanees
+pip install -r requirements-server.txt
 ```
 
-### 2. Start vLLM Server (separate terminal)
+### 2. Start vLLM (separate terminal tab)
 
 ```bash
 vllm serve Qwen/Qwen2.5-14B-Instruct-AWQ \
@@ -427,49 +367,33 @@ vllm serve Qwen/Qwen2.5-14B-Instruct-AWQ \
   --port 8000
 ```
 
-Wait for `INFO: Application startup complete` before proceeding.
+Wait for the vLLM startup logs to confirm the server is serving before starting Wanees.
 
-### 3. Start Wanees Server
+### 3. Configure environment
 
 ```bash
-# Recommended for development — no Lightning orchestrator needed
-python server.py --standalone
-
-# Production — via Lightning AI orchestrator
-python server.py
+cp .env.example .env
+# edit .env — at minimum set EMERGENCY_ENDPOINT to your caregiver backend
 ```
 
-### 4. Environment Variables
+### 4. Start the Wanees server
+
+```bash
+cd server
+python main.py
+```
+
+On startup, `ModelManager` loads the ASR pipeline, connects the vLLM client, and downloads/loads the EGTTS model (auto-downloaded from the Hugging Face Hub on first run).
+
+### Environment variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `VLLM_API_BASE` | `http://localhost:8000/v1` | vLLM server endpoint |
-| `VLLM_MODEL_NAME` | `Qwen/Qwen2.5-14B-Instruct-AWQ` | Model identifier sent to vLLM API |
-| `WS_HOST` | `0.0.0.0` | WebSocket bind address |
-| `WS_PORT` | `8765` | WebSocket port |
-| `HF_HOME` | `~/hf` | HuggingFace cache root |
-
-### Lightning AI Studio Config
-
-```yaml
-# .lightning/studio.yml
-name: wanees-voice-assistant
-compute:
-  type: gpu
-  gpu_type: T4        # minimum: T4 16GB | recommended: A100 40GB
-  num_gpus: 1
-environment:
-  python: "3.10"
-  cuda: "12.1"
-```
-
-### Model Download (first run)
-
-On first startup, `ModelManager` auto-downloads via HuggingFace Hub:
-
-- **ASR**: `IbrahimAmin/egyptian-arabic-wav2vec2-xlsr-53` — ~1.2GB
-- **TTS**: `OmarSamir/EGTTS-V0.1` — downloaded via `snapshot_download`, includes `config.json`, `*.pth`, `*.wav` reference audio
-- **LLM**: Pre-loaded by the vLLM server process (`Qwen/Qwen2.5-14B-Instruct-AWQ` — ~7GB)
+| `VLLM_API_BASE` | `http://localhost:8000/v1` | vLLM OpenAI-compatible endpoint |
+| `VLLM_MODEL_NAME` | `Qwen/Qwen2.5-14B-Instruct-AWQ` | Model name passed to the vLLM client |
+| `API_HOST` | `0.0.0.0` | FastAPI bind address |
+| `API_PORT` | `7501` | FastAPI bind port |
+| `EMERGENCY_ENDPOINT` | *(none — must be set)* | Backend URL that receives emergency alerts |
 
 ---
 
@@ -477,258 +401,168 @@ On first startup, `ModelManager` auto-downloads via HuggingFace Hub:
 
 ### Hardware
 
-- Raspberry Pi 4 or 5 (4GB+ RAM recommended)
-- USB microphone or I2S HAT (e.g. ReSpeaker 2-Mic)
+- Raspberry Pi 4 or newer
+- USB microphone or I2S HAT
 - Speaker (3.5mm or USB)
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
 ```bash
-pip install sounddevice numpy websockets tensorflow openwakeword
-pip install webrtcvad   # strongly recommended for accurate VAD
+cd client
+pip install -r ../requirements-client.txt
 ```
 
-### 2. Copy Wake Word Model to Pi
+### 2. Get a Porcupine access key and train a wake word
+
+Create a free account at [console.picovoice.ai](https://console.picovoice.ai), generate an access key, and train a custom keyword model (`.ppn` file) for your chosen wake phrase.
+
+### 3. Place the wake word model
 
 ```bash
-# From development machine:
-scp wakeword_models/ya_Wanees.tflite pi@<PI_IP>:/home/pi/younes/wanees.tflite
+mkdir -p ../models
+cp /path/to/your-wakeword.ppn ../models/wanees_wakeword.ppn
 ```
 
-### 3. Configure `pi_main.py`
-
-Edit the config block at the top of the file:
-
-```python
-SERVER_URI      = "ws://<YOUR_LIGHTNING_SERVER_IP>:8765"
-USER_ID         = "pi-living-room-001"           # unique per physical device
-WAKEWORD_MODEL  = "/home/pi/younes/wanees.tflite"
-WAKEWORD_THRESH = 0.4
-```
-
-### 4. Run
+### 4. Configure environment
 
 ```bash
-python pi_main.py
+cp ../.env.example ../.env
+# set WANEES_SERVER_URL, WANEES_USER_ID, PORCUPINE_ACCESS_KEY, PPN_MODEL_PATH
 ```
 
-Expected output:
-```
-==================================================
-  Wanees AI — Raspberry Pi Client
-==================================================
-  VAD      : WebRTC ✅
-  Model    : /home/pi/younes/wanees.tflite
-  Server   : ws://x.x.x.x:8765
-  Threshold: 0.4
-  User ID  : pi-living-room-001
+### 5. Run
 
-✅ All checks passed — starting...
-
-👂 Listening for "ونيس" or "يا ونيس"...
+```bash
+python pi_client.py
 ```
 
-### VAD & Wake Word Tuning Reference
+Expected console output:
 
-| Parameter | Default | Notes |
+```
+⏳ Loading Porcupine…
+⏳ Loading Silero VAD…
+✅ Ready — listening for the wake word…
+```
+
+Say the wake word, speak your message, and the Pi will record until Silero VAD detects the end of speech (or a 0.8s silence fallback triggers), send the audio to the server, and play back the streamed reply.
+
+### Tuning reference (as implemented)
+
+| Parameter | Value | Location |
 |---|---|---|
-| `VAD_AGGRESSIVENESS` | `2` | 0 = permissive, 3 = aggressive |
-| `VAD_SILENCE_SEC` | `1.2` | Seconds of silence before recording stops |
-| `VAD_MAX_SEC` | `10.0` | Maximum recording duration |
-| `VAD_MIN_SEC` | `0.8` | Recordings shorter than this are discarded |
-| `WAKEWORD_THRESH` | `0.4` | Lower = more sensitive, more false positives |
-| `COOLDOWN_SEC` | `2.0` | Minimum gap between consecutive detections |
-| `SCORE_EVERY` | `4` chunks | Scoring interval = 320ms (CPU efficiency) |
+| VAD silence threshold | `min_silence_duration_ms=600` | `client/pi_client.py`, `VADIterator` |
+| VAD speech padding | `speech_pad_ms=100` | `client/pi_client.py`, `VADIterator` |
+| VAD silence fallback guard | `0.8s` (`MAX_SILENCE_FRAMES`) | `client/pi_client.py` main loop |
+| Max wait for speech after wake word | `5s` | `client/pi_client.py` main loop |
+| TTS chunk size (server → Pi) | `0.3s` per chunk | `server/main.py`, `synthesize_streaming` |
 
 ---
 
-## 🗣️ Wake Word Training
+## 🗣️ Wake Word Training (Porcupine)
 
-The wake word `ونيس` / `يا ونيس` is a custom TFLite binary classifier trained on top of OpenWakeWord's pre-trained audio embedding backbone (`AudioFeatures`).
+Unlike TFLite/OpenWakeWord-based setups, this project uses **Picovoice Porcupine**, which trains and hosts your custom keyword model for you — no local training pipeline to maintain.
 
-### Quick Synthetic Training (no recordings required)
-
-```python
-from openwakeword.train import train_model
-
-train_model(
-    model_name="ya_Wanees",
-    positive_references=[
-        "ya wanees",   # English phonetic
-        "wanees",
-        "يا ونيس",     # Arabic spelling
-        "ونيس",
-    ],
-    n_samples=5000,
-    output_dir="./wakeword_models",
-)
-```
-
-### Fine-tuning with Real Voice Samples (recommended for production)
-
-```python
-import sounddevice as sd, numpy as np
-
-def record_sample(filename, duration=2):
-    audio = sd.rec(int(duration * 16000), samplerate=16000,
-                   channels=1, dtype='int16')
-    sd.wait()
-    audio.tofile(filename)
-
-# 20 positive samples — say "يا ونيس"
-for i in range(20):
-    input(f"Press Enter then say 'يا ونيس' ({i+1}/20)")
-    record_sample(f"my_samples/positive/sample_{i+1}.raw")
-
-# 20 negative samples — random speech, not the wake word
-for i in range(20):
-    input(f"Press Enter then say anything except 'ونيس' ({i+1}/20)")
-    record_sample(f"my_samples/negative/sample_{i+1}.raw")
-
-train_model(
-    model_name="ya_Wanees",
-    positive_references=["ya wanees", "wanees", "يا ونيس", "ونيس"],
-    positive_wav_files="./my_samples/positive",
-    negative_wav_files="./my_samples/negative",
-    n_samples=5000,
-    output_dir="./wakeword_models",
-)
-```
-
-### Wake Word Inference Architecture (Pi)
-
-```
-16kHz audio → 1-second rolling buffer (16,000 int16 samples)
-    → AudioFeatures.embed_clips()        # openWakeWord backbone
-    → mean-pool  → shape (1, 96) float32
-    → TFLite classifier.invoke()
-    → score: float 0.0 – 1.0
-    → if score ≥ 0.4: trigger VAD → record → send to server
-```
+1. Go to [console.picovoice.ai](https://console.picovoice.ai) and sign in.
+2. Create a new wake word under **Porcupine → Custom Wake Word**, choose your target language, and type your phrase (e.g. "يا ونيس" or a transliteration, depending on language support).
+3. Download the trained `.ppn` model for your target platform (**Raspberry Pi** — pick the correct architecture).
+4. Copy the `.ppn` file to the Pi and point `PPN_MODEL_PATH` at it (see [`.env.example`](.env.example)).
+5. Tune sensitivity by adjusting how `pvporcupine.create(...)` is called in `client/pi_client.py` if you need to trade off false accepts vs. missed detections (Porcupine's `sensitivities` parameter, not currently exposed as an env var — add one if you need per-deployment tuning).
 
 ---
 
 ## 📁 Project Structure
 
 ```
-Voice-Assistant-For-Elder/
+wanees/
 │
-├── server.py                  ← Lightning AI cloud server
-│   ├── ModelManager           ·  Loads ASR + vLLM client + EGTTS at startup
-│   ├── YounesPipeline         ·  ASR → Emergency check → LLM → TTS async generator
-│   ├── ws_handler             ·  WebSocket protocol: audio + medication push
-│   ├── YounesServer           ·  LightningWork component (parallel=True)
-│   └── YounesApp              ·  LightningApp entry point
+├── server/
+│   └── main.py                 ← FastAPI server
+│       ├── ModelManager        ·  loads ASR pipeline, vLLM client, EGTTS at startup
+│       ├── WaneesPipeline      ·  ASR → emergency check → LLM → TTS async generator
+│       ├── /transcribe/{id}    ·  main voice endpoint (StreamingResponse)
+│       ├── /remind, /remind/*  ·  medication reminder queue + audio delivery
+│       └── /health             ·  health check
 │
-├── pi_main.py                 ← Raspberry Pi edge client
-│   ├── load_models()          ·  TFLite interpreter + OpenWakeWord AudioFeatures
-│   ├── get_wakeword_score()   ·  Embedding extraction + TFLite inference
-│   ├── record_with_vad()      ·  WebRTC VAD recording loop (energy fallback)
-│   ├── send_to_server()       ·  WebSocket client: JSON header + binary audio
-│   └── main()                 ·  Rolling buffer + wake word detection loop
+├── client/
+│   └── pi_client.py            ← Raspberry Pi edge client
+│       ├── Porcupine           ·  wake word detection
+│       ├── Silero VAD          ·  streaming endpointing (VADIterator)
+│       ├── stream_audio_to_server · HTTP POST + playback
+│       └── main loop           ·  wake word → VAD capture → send → play
 │
-├── wakeword_training.py       ← Wake word training + sample collection scripts
-│
-├── wakeword_models/           ← Trained TFLite wake word models
-│   └── ya_Wanees.tflite
-│
-└── my_samples/                ← Voice samples for fine-tuning
-    ├── positive/              ·  "يا ونيس" recordings (.raw PCM)
-    └── negative/              ·  Non-wake-word speech (.raw PCM)
+├── models/                     ← (gitignored) place your .ppn wake-word model here
+├── docs/
+│   └── architecture.md         ← deeper technical notes
+├── requirements-server.txt
+├── requirements-client.txt
+├── .env.example
+├── .gitignore
+├── LICENSE
+└── README.md
 ```
 
 ---
 
-## 🗺️ Future Roadmap
+## 🗺️ Roadmap
 
 ```
-v1.0 — Current Release
-  ✅ Egyptian Ammiya ASR  (Wav2Vec2-XLSR-53)
-  ✅ Qwen2.5-14B-AWQ via vLLM with Younes persona
-  ✅ EGTTS-V0.1 streaming TTS at 24kHz, 0.5s chunks
-  ✅ Custom TFLite wake word "ونيس"
-  ✅ WebRTC VAD endpointing on Pi
+Now
+  ✅ Egyptian Ammiya ASR (Wav2Vec2-XLSR-53)
+  ✅ Qwen2.5-14B-AWQ via vLLM with the Wanees persona
+  ✅ EGTTS-V0.1 streaming TTS, 24kHz, 0.3s chunks
+  ✅ Porcupine wake word on the Pi
+  ✅ Streaming Silero VAD endpointing
   ✅ Emergency keyword detection with LLM bypass
-  ✅ Medication reminder push via WebSocket
-  ✅ 6-turn conversation history per device
-  ✅ ~4s end-to-end latency on T4 GPU
+  ✅ Medication reminder queue + polling delivery
+  ✅ 6-turn rolling conversation history per device
 
-v1.5 — Multi-Dialect Support
-  🔲 Levantine Arabic ASR (Syrian, Lebanese, Palestinian)
-  🔲 Gulf Arabic ASR (Saudi, UAE)
-  🔲 Automatic dialect identification + ASR routing
-  🔲 Dialect-matched TTS voices
+Next
+  🔲 Persist conversation history & reminder queues (Redis/DB instead of in-memory)
+  🔲 Authenticate Pi ↔ server requests
+  🔲 Expand/validate the emergency keyword list; consider a lightweight classifier
+  🔲 Automated tests for the pipeline and emergency-detection logic
+  🔲 Real caregiver backend integration examples (SMS, WhatsApp, push notifications)
 
-v2.0 — Health Intelligence Layer
-  🔲 Scheduled medication reminders via cron + backend API
-  🔲 Real emergency backend integration (SMS, WhatsApp, HTTP POST)
-  🔲 Passive speech biomarker monitoring (cognitive decline indicators)
-  🔲 Fall detection via ambient audio classification
-  🔲 Emergency contact management interface
-
-v2.5 — Full Edge / Offline Mode
-  🔲 llama.cpp GGUF backend for fully offline Pi inference
-  🔲 On-device Whisper.cpp ASR (no network ASR)
-  🔲 TensorRT-optimized TTS for Jetson Nano
-  🔲 MQTT multi-device coordination
-
-v3.0 — Research Platform
-  🔲 Annotated Egyptian elderly speech corpus (open release)
-  🔲 Federated learning for privacy-preserving dialect improvement
-  🔲 Benchmark suite for Arabic geriatric voice AI evaluation
+Later
+  🔲 Multi-dialect ASR/TTS support (Levantine, Gulf)
+  🔲 Offline/edge-only inference mode for constrained deployments
+  🔲 Caregiver-facing dashboard for reminders and alert history
 ```
 
 ---
 
 ## 🤝 Contributing
 
-Contributions from engineers, Arabic NLP researchers, and clinical practitioners are warmly welcomed.
+Contributions are welcome — please open an issue to discuss significant changes before submitting a pull request.
 
 ```bash
 git checkout -b feature/your-feature-name
 # make changes
 git push origin feature/your-feature-name
-# → open Pull Request
+# → open a Pull Request
 ```
 
-**Priority areas:**
+**Areas that could especially use help:**
 
-| Area | Skills Needed | Priority |
-|---|---|---|
-| Real emergency backend (SMS/HTTP) | Backend, webhooks | 🔴 Critical |
-| Egyptian dialect speech corpus expansion | Annotation, Arabic linguistics | 🔴 Critical |
-| Fully offline Pi deployment (llama.cpp) | C++, embedded, GGUF | 🟠 High |
-| WebRTC VAD tuning for elderly speech patterns | DSP, audio ML | 🟠 High |
-| Multi-dialect ASR routing | NLP, Arabic dialectology | 🟡 Medium |
-| Caregiver dashboard UI | React Native / Flutter | 🟡 Medium |
+| Area | Skills needed |
+|---|---|
+| Real caregiver backend integration (SMS/HTTP/push) | Backend, webhooks |
+| Persistent storage for history & reminders | Redis/Postgres, backend |
+| Pi ↔ server authentication | Security, backend |
+| Expanded/validated emergency phrase coverage | Arabic linguistics, annotation |
+| Automated testing | Python testing (pytest) |
 
 ---
 
-## 📄 Citation
+## 📄 License
 
-```bibtex
-@software{wanees2025,
-  author       = {Asser Mosa},
-  title        = {Wanees (ونيس): Open-Source Egyptian Arabic Voice Assistant for Elderly Care},
-  year         = {2025},
-  publisher    = {GitHub},
-  howpublished = {\url{https://github.com/assermosa/Voice-Assistant-For-Elder}},
-  note         = {Stack: Wav2Vec2-XLSR-53 ASR + Qwen2.5-14B-AWQ via vLLM +
-                  EGTTS-V0.1 TTS + TFLite Wake Word.
-                  Lightning AI cloud inference + Raspberry Pi edge deployment.}
-}
-```
-
----
+Released under the [MIT License](LICENSE).
 
 <div align="center">
+<br>
 
 **Built with care for the people who built our world.**
 
 *"ربنا يبارك في عمرك"*
-
-⭐ Star this repository if Wanees inspires your work ⭐
-
-[🐛 Report Bug](https://github.com/assermosa/Voice-Assistant-For-Elder/issues) · [💡 Request Feature](https://github.com/assermosa/Voice-Assistant-For-Elder/issues)
 
 </div>
