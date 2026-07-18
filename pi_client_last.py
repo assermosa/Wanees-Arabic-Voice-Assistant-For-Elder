@@ -122,10 +122,13 @@ print("⏳ Loading openWakeWord wake word engine (ONNX)…")
 oww_model = OWWModel(
     wakeword_model_paths=[OWW_MODEL_PATH],
 )
-# openWakeWord's default chunk size is 1280 samples (80ms @ 16kHz).
-# We keep this as the frame length used everywhere frame_length was
-# previously referenced (VAD recording, mic reads, etc.).
-FRAME_LEN = 1280
+# openWakeWord recommends 1280-sample (80ms) chunks for lowest CPU use,
+# but its preprocessor buffers audio internally and accepts smaller
+# chunks too. Silero VAD, however, REQUIRES exactly 512 samples per
+# frame at 16kHz (hard constraint, not configurable) — so FRAME_LEN
+# must stay at 512 since it's shared by both the wake-word read loop
+# and record_speech_with_vad().
+FRAME_LEN = 512
 # Resolve the model's key name (basename without extension) so we can
 # read its score out of the prediction dict below.
 import os
