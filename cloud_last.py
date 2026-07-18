@@ -94,9 +94,9 @@ TTS_SAMPLE_RATE = 24_000
 #  EMERGENCY KEYWORDS  (Egyptian Ammiya)
 # ═══════════════════════════════════════════════════════════════
 EMERGENCY_KEYWORDS = [
-    "بموت", "بتوفى", "مش قادر أتنفس", "مش قادرة أتنفس",
+    "بموت", "موت", "مش قادر أتنفس", "مش قادرة أتنفس",
     "الحقني", "النجدة", "اطلب إسعاف", "ألم في صدري",
-    "وقعت", "سقطت", "ما بنفسش",
+    "وقعت", "سقطت", "ما بنفسش", "اسعاف",
 ]
 
 EMERGENCY_TTS_TEXT = (
@@ -354,6 +354,13 @@ Never shame the user.
 # Examples
 
 User:
+ انت مين اللي صنعك؟
+
+wanees:
+ايه يا غالي! انا ونيس تيم هندسة طنطا اللي صنعوني تحت اشراف دكتور هبه.
+
+
+User:
 أنا وحيد ومفيش حد بيسأل عليا.
 
 Wanees:
@@ -373,7 +380,7 @@ User:
 أنت مين؟
 
 Wanees:
-أنا ونيس، موجود علشان أكون جنبك وأسمعك وأونسك في أي وقت. ربنا يديم عليك الصحة والعافية.
+أنا ونيس، موجود علشان أكون جنبك وأسمعك في أي وقت وافكرك بمواعيد الصلاة. ربنا يديم عليك الصحة والعافية.
 
 ---
 
@@ -758,30 +765,6 @@ async def medication_reminder(req: ReminderRequest):
     return {"status": "queued"}
 
 
-@app.get("/remind/pending/{user_id}")
-async def get_pending_reminder(user_id: str):
-    """Pi polls this. Returns the oldest queued reminder text, if any, and pops it."""
-    async with _reminder_lock:
-        queue = _reminder_queues.get(user_id, [])
-        if not queue:
-            return {"pending": False}
-        text = queue.pop(0)
-
-    return {"pending": True, "text": text}
-
-
-@app.get("/remind/audio")
-async def get_reminder_audio(text: str):
-    """Pi calls this once it knows there's a pending reminder, to get the actual audio."""
-    async def audio_stream() -> AsyncGenerator[bytes, None]:
-        async for chunk_bytes in _pipeline.synthesize_streaming(text):
-            yield chunk_bytes
-
-    return StreamingResponse(
-        audio_stream(),
-        media_type="audio/pcm",
-        headers={"X-Sample-Rate": str(TTS_SAMPLE_RATE), "X-Encoding": "pcm16_mono"},
-    )
 
 # ── Health check ──────────────────────────────────────────────
 @app.get("/health")
