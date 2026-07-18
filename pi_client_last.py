@@ -121,7 +121,7 @@ def play_beep(audio: np.ndarray = None) -> None:
 
 print("⏳ Loading openWakeWord wake word engine (ONNX)…")
 oww_model = OWWModel(
-    wakeword_models=[OWW_MODEL_PATH],
+    wakeword_model_paths=[OWW_MODEL_PATH],
     inference_framework=OWW_INFERENCE_FW,
 )
 # openWakeWord's default chunk size is 1280 samples (80ms @ 16kHz).
