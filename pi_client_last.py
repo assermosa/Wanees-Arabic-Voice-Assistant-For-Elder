@@ -37,7 +37,6 @@ USER_ID         = "pi-living-room-001"
 # openWakeWord config (replaces PPN_ACCESS_KEY / PPN_MODEL_PATH)
 OWW_MODEL_PATH   = "wa-nees_en_raspberry-pi_v4_0_0.onnx"
 OWW_THRESHOLD    = 0.002
-OWW_INFERENCE_FW = "onnx"
 
 # Audio
 RATE             = 16_000
@@ -122,7 +121,6 @@ def play_beep(audio: np.ndarray = None) -> None:
 print("⏳ Loading openWakeWord wake word engine (ONNX)…")
 oww_model = OWWModel(
     wakeword_model_paths=[OWW_MODEL_PATH],
-    inference_framework=OWW_INFERENCE_FW,
 )
 # openWakeWord's default chunk size is 1280 samples (80ms @ 16kHz).
 # We keep this as the frame length used everywhere frame_length was
