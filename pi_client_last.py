@@ -11,9 +11,7 @@ Addition: background thread polls the backend for pending medication
 reminders and plays them through the same speaker, using a shared
 lock so reminder audio never overlaps with conversation audio.
 
-Change: Wake word engine switched from Porcupine (pvporcupine) to
-openWakeWord using a custom ONNX model, with a low detection
-threshold of 0.002.
+Wake word engine: openWakeWord (ONNX runtime), threshold=0.002
 """
 
 import math
@@ -24,11 +22,10 @@ import time
 
 import numpy as np
 import pyaudio
+from openwakeword.model import Model as OWWModel
 import requests
 import sounddevice as sd
 import torch
-
-from openwakeword.model import Model as OWWModel
 
 # ═══════════════════════════════════════════════════════════════
 #  CONFIG
@@ -37,10 +34,10 @@ from openwakeword.model import Model as OWWModel
 SERVER_URL      = "https://7501-01khejztq1640gknejy92er4gq.cloudspaces.litng.ai/transcribe"
 USER_ID         = "pi-living-room-001"
 
-# openWakeWord wake word engine
-OWW_MODEL_PATH  = "wa-nees_v4_0_0.onnx"   # path to your custom openWakeWord ONNX model
-OWW_THRESHOLD   = 0.002                    # detection threshold
-OWW_FRAME_LEN   = 1280                     # openWakeWord requires 80ms chunks @ 16kHz
+# openWakeWord config (replaces PPN_ACCESS_KEY / PPN_MODEL_PATH)
+OWW_MODEL_PATH   = "wa-nees_en_raspberry-pi_v4_0_0.onnx"
+OWW_THRESHOLD    = 0.002
+OWW_INFERENCE_FW = "onnx"
 
 # Audio
 RATE             = 16_000
@@ -122,15 +119,20 @@ def play_beep(audio: np.ndarray = None) -> None:
 #  MODEL LOADING
 # ═══════════════════════════════════════════════════════════════
 
-print("⏳ Loading openWakeWord wake word engine…")
+print("⏳ Loading openWakeWord wake word engine (ONNX)…")
 oww_model = OWWModel(
     wakeword_models=[OWW_MODEL_PATH],
-    inference_framework="onnx",
+    inference_framework=OWW_INFERENCE_FW,
 )
-OWW_MODEL_NAME = list(oww_model.models.keys())[0]
-FRAME_LEN = OWW_FRAME_LEN
-print(f"✅ openWakeWord ready  (model={OWW_MODEL_NAME}, frame_length={FRAME_LEN}, "
-      f"threshold={OWW_THRESHOLD})")
+# openWakeWord's default chunk size is 1280 samples (80ms @ 16kHz).
+# We keep this as the frame length used everywhere frame_length was
+# previously referenced (VAD recording, mic reads, etc.).
+FRAME_LEN = 1280
+# Resolve the model's key name (basename without extension) so we can
+# read its score out of the prediction dict below.
+import os
+OWW_MODEL_KEY = os.path.splitext(os.path.basename(OWW_MODEL_PATH))[0]
+print(f"✅ openWakeWord ready  (frame_length={FRAME_LEN}, threshold={OWW_THRESHOLD})")
 
 print("⏳ Loading Silero VAD…")
 vad_model, vad_utils = torch.hub.load(
@@ -494,7 +496,7 @@ mic_stream = pa.open(
     frames_per_buffer=FRAME_LEN,
 )
 
-print("👂 Listening for wake word…\n")
+print("👂 Listening for 'يا ونيس'…\n")
 
 # Start the reminder polling thread in the background, independent
 # of the wake-word loop below.
@@ -504,13 +506,13 @@ try:
     while True:
 
         # ══════════════════════════════════════════════════════
-        #  PHASE 1 — Wake Word Detection (openWakeWord)
+        #  PHASE 1 — Wake Word Detection (openWakeWord / ONNX)
         # ══════════════════════════════════════════════════════
-        raw = mic_stream.read(FRAME_LEN, exception_on_overflow=False)
-        pcm_int16 = np.frombuffer(raw, dtype=np.int16)
+        raw       = mic_stream.read(FRAME_LEN, exception_on_overflow=False)
+        pcm_frame = np.frombuffer(raw, dtype=np.int16)
 
-        predictions = oww_model.predict(pcm_int16)
-        score = predictions.get(OWW_MODEL_NAME, 0.0)
+        prediction = oww_model.predict(pcm_frame)
+        score      = prediction.get(OWW_MODEL_KEY, 0.0)
 
         if score < OWW_THRESHOLD:
             continue
@@ -521,8 +523,8 @@ try:
         beep_thread.start()
         beep_thread.join()
 
-        # Reset the model's internal buffers so a stale high score
-        # doesn't immediately re-trigger on the next loop iteration.
+        # Reset openWakeWord's internal buffers so residual audio from
+        # the trigger doesn't cause an immediate re-trigger later.
         oww_model.reset()
 
         # ══════════════════════════════════════════════════════
